@@ -1,11 +1,17 @@
-"""from EQTransformer.core.EqT_utils import f1, SeqSelfAttention, FeedForward, LayerNormalization
+from EQTransformer.core.EqT_utils import f1, SeqSelfAttention, FeedForward, LayerNormalization
 from EQTransformer.core.mseed_predictor import mseed_predictor, _mseed2nparry, PreLoadGeneratorTest
 import keras
 from keras.models import load_model
-import keras2onnx"""
+from keras.optimizers import Adam
+from keras.engine.training_utils import iter_sequence_infinite
+import keras2onnx
 import platform
 from os import listdir
 from os.path import join
+import pprint as pp
+import numpy as np
+
+import onnxruntime
 
 # original
 # detection.ipynb
@@ -18,12 +24,13 @@ from os.path import join
 model.compile(loss = ['binary_crossentropy', 'binary_crossentropy', 'binary_crossentropy'],
               loss_weights = [0.02, 0.40, 0.58],           
               optimizer = Adam(lr = 0.001),
-              metrics = [f1])
+              metrics = [f1])"""
 
-time_slots, comp_types = [], []
+sess_options = onnxruntime.SessionOptions()
+sess = onnxruntime.InferenceSession('eqt_model.onnx', sess_options)
 
 params_pred = {'batch_size': 500,
-               'norm_mode': 'std'}"""
+               'norm_mode': 'std'}
 
 args = {'input_dir': 'downloads_mseeds',
         'stations_json': 'station_list.json',
@@ -50,4 +57,24 @@ for ct, st in enumerate(station_list):
 
     for _, month in enumerate(uni_list):
         matching = [s for s in file_list if month in s]
-        print(matching)
+        print(f'{month}')
+        meta, time_slots, comp_types, data_set = _mseed2nparry(args, matching, time_slots, comp_types, st)
+
+        pred_generator = PreLoadGeneratorTest(meta["trace_start_time"], data_set, **params_pred)
+
+        #predD, predP, predS = model.predict_generator(pred_generator)
+        #pp.pprint(predD)
+        #pp.pprint(predP)
+        #pp.pprint(predS)
+
+        out_pred_generator = iter_sequence_infinite(pred_generator)
+        x = next(out_pred_generator)
+        x_test = list(x.values())[0].astype(np.float32)
+        res = sess.run(None, input_feed={'input': x_test})
+        print(len(res))
+        """steps_done = 0
+        steps = len(pred_generator)
+        while steps_done < steps:
+            generator_output = next(out_pred_generator)
+            pp.pprint(list(generator_output.values()))
+            steps_done += 1"""
