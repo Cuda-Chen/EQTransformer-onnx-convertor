@@ -19,7 +19,7 @@ params_pred = {'batch_size': 500,
 args = {'input_dir': 'downloads_mseeds',
         'stations_json': 'station_list.json',
         'overlap': 0.3}
-
+"""
 # original
 # detection.ipynb
 print('Keras:')
@@ -61,7 +61,9 @@ for ct, st in enumerate(station_list):
         pred_generator = PreLoadGeneratorTest(meta["trace_start_time"], data_set, **params_pred)
 
         predD, predP, predS = model.predict_generator(pred_generator)
-
+        
+        print(f'{len(predD)},{len(predP)},{len(predS)}')
+"""
 # ONNX port
 print('ONNX:')
 sess_options = onnxruntime.SessionOptions()
@@ -93,16 +95,27 @@ for ct, st in enumerate(station_list):
 
         pred_generator = PreLoadGeneratorTest(meta["trace_start_time"], data_set, **params_pred)
 
+        all_outs = []
+
+        # ONNX model predict_generator monkey typing
         out_pred_generator = iter_sequence_infinite(pred_generator)
         steps_done = 0
         steps = len(pred_generator)
-
-        # ONNX model predict_generator monkey typing
         while steps_done < steps:
             generator_output = next(out_pred_generator)
 
             x = generator_output
             x_test = list(x.values())[0].astype(np.float32)
-            res = sess.run(None, input_feed={'input': x_test})
+            outs = sess.run(None, input_feed={'input': x_test})
+        
+            if not all_outs:
+                for out in outs:
+                    all_outs.append([])
+
+            for i, out in enumerate(outs):
+                all_outs[i].append(out)
 
             steps_done += 1
+
+        results = [np.concatenate(out) for out in all_outs]
+        print(len(results[0])) 
