@@ -46,6 +46,34 @@ args = {'input_dir': 'downloads_mseeds',
          'gpuid': None,
          'gpu_limit': None}
 overwrite = False
+
+# ONNX model predict_generator monkey typing
+def onnx_predict_generator(pred_generator):
+    all_outs = []
+    out_pred_generator = iter_sequence_infinite(pred_generator)
+    steps_done = 0
+    steps = len(pred_generator)
+
+    while steps_done < steps:
+        generator_output = next(out_pred_generator)
+
+        x = generator_output
+        x_test = list(x.values())[0].astype(np.float32)
+        outs = sess.run(None, input_feed={'input': x_test})
+    
+        if not all_outs:
+            for out in outs:
+                all_outs.append([])
+
+        for i, out in enumerate(outs):
+            all_outs[i].append(out)
+
+        steps_done += 1
+
+    results = [np.concatenate(out) for out in all_outs]
+    #print(f'{len(results[0])},{len(results[1])},{len(results[2])}')
+    return results[0], results[1], results[2]
+
 """
 # original
 # detection.ipynb
@@ -95,8 +123,8 @@ for ct, st in enumerate(station_list):
 print('ONNX:')
 sess_options = onnxruntime.SessionOptions()
 sess = onnxruntime.InferenceSession('eqt_model.onnx', sess_options)
-"""sess = onnxruntime.InferenceSession('eqt_optimized.onnx', sess_options)
-args['output_dir'] = 'detections_onnx_optimized'"""
+#sess = onnxruntime.InferenceSession('eqt_optimized.onnx', sess_options)
+#args['output_dir'] = 'detections_onnx_optimized'
 
 out_dir = os.path.join(os.getcwd(), str(args['output_dir']))
 if os.path.isdir(out_dir):
@@ -178,7 +206,7 @@ for ct, st in enumerate(station_list):
 
         pred_generator = PreLoadGeneratorTest(meta["trace_start_time"], data_set, **params_pred)
 
-        all_outs = []
+        """all_outs = []
 
         # ONNX model predict_generator monkey typing
         out_pred_generator = iter_sequence_infinite(pred_generator)
@@ -202,7 +230,8 @@ for ct, st in enumerate(station_list):
 
         results = [np.concatenate(out) for out in all_outs]
         #print(f'{len(results[0])},{len(results[1])},{len(results[2])}')
-        predD, predP, predS  = results[0], results[1], results[2]
+        predD, predP, predS  = results[0], results[1], results[2]"""
+        predD, predP, predS = onnx_predict_generator(pred_generator)
         detection_memory = []
         for ix in range(len(predD)):
             matches, pick_errors, yh3 =  _picker(args, predD[ix][:, 0], predP[ix][:, 0], predS[ix][:, 0])        
