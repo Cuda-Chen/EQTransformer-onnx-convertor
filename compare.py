@@ -24,6 +24,8 @@ import sys
 import os
 import csv
 import shutil
+import time
+import pandas as pd
 
 params_pred = {'batch_size': 500,
                'norm_mode': 'std'}
@@ -93,6 +95,8 @@ for ct, st in enumerate(station_list):
 print('ONNX:')
 sess_options = onnxruntime.SessionOptions()
 sess = onnxruntime.InferenceSession('eqt_model.onnx', sess_options)
+"""sess = onnxruntime.InferenceSession('eqt_optimized.onnx', sess_options)
+args['output_dir'] = 'detections_onnx_optimized'"""
 
 out_dir = os.path.join(os.getcwd(), str(args['output_dir']))
 if os.path.isdir(out_dir):
@@ -152,6 +156,9 @@ for ct, st in enumerate(station_list):
                              's_snr'
                                  ])  
     csvPr_gen.flush()
+    print(f"Started working on {st}, {ct+1} out of {len(station_list)} ...", flush=True)
+
+    start_Predicting = time.time()
 
     if platform.system() == 'Windows':
         file_list = [join(st, ev) for ev in listdir(args["input_dir"]+"\\"+st) if ev.split("\\")[-1].split(".")[-1].lower() == "mseed"]
@@ -166,7 +173,7 @@ for ct, st in enumerate(station_list):
 
     for _, month in enumerate(uni_list):
         matching = [s for s in file_list if month in s]
-        print(f'{month}')
+        print(f'{month}', flush=True)
         meta, time_slots, comp_types, data_set = _mseed2nparry(args, matching, time_slots, comp_types, st)
 
         pred_generator = PreLoadGeneratorTest(meta["trace_start_time"], data_set, **params_pred)
@@ -207,3 +214,16 @@ for ct, st in enumerate(station_list):
                 if plt_n < args['number_of_plots'] and post_write > pre_write:
                     _plotter_prediction(data_set[meta["trace_start_time"][ix]], args, save_figs, predD[ix][:, 0], predP[ix][:, 0], predS[ix][:, 0], meta["trace_start_time"][ix], matches)
                     plt_n += 1  
+
+    end_Predicting = time.time()
+    delta = (end_Predicting - start_Predicting)
+    hour = int(delta / 3600)
+    delta -= hour * 3600
+    minute = int(delta / 60)
+    delta -= minute * 60
+    seconds = delta
+
+    dd = pd.read_csv(os.path.join(save_dir,'X_prediction_results.csv'))
+    print(f"Finished the prediction in: {hour} hours and {minute} minutes and {round(seconds, 2)} seconds.", flush=True)
+    print(f'*** Detected: '+str(len(dd))+' events.', flush=True)
+    print(' *** Wrote the results into --> " ' + str(save_dir)+' "', flush=True)
