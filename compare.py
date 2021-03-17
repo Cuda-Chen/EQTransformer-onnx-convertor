@@ -26,10 +26,12 @@ import csv
 import shutil
 import time
 import pandas as pd
+import json
+import obspy
+from obspy import read
 
-params_pred = {'batch_size': 500,
+"""params_pred = {'batch_size': 500,
                'norm_mode': 'std'}
-
 args = {'input_dir': 'downloads_mseeds',   
          'input_model': 'EqT_model.h5',
          'stations_json': 'station_list.json',
@@ -42,6 +44,24 @@ args = {'input_dir': 'downloads_mseeds',
          'plot_mode': 'time_frequency',
          'normalization_mode': 'std',
          'batch_size': 500,
+         'overlap': 0.3,
+         'gpuid': None,
+         'gpu_limit': None}"""
+
+params_pred = {'batch_size': 1,
+               'norm_mode': 'std'}
+args = {'input_dir': 'test_dataset',   
+         'input_model': 'EqT_model.h5',
+         'stations_json': 'test_dataset/test_dataset.json',
+         'output_dir': 'test_detections',
+         'loss_weights': [0.02, 0.40, 0.58],          
+         'detection_threshold': 0.3,                
+         'P_threshold': 0.1,
+         'S_threshold': 0.1, 
+         'number_of_plots': 10,
+         'plot_mode': 'time_frequency',
+         'normalization_mode': 'std',
+         'batch_size': 1,
          'overlap': 0.3,
          'gpuid': None,
          'gpu_limit': None}
@@ -73,6 +93,96 @@ def onnx_predict_generator(pred_generator):
     results = [np.concatenate(out) for out in all_outs]
     #print(f'{len(results[0])},{len(results[1])},{len(results[2])}')
     return results[0], results[1], results[2]
+
+def mseed2nparry_one_minute(args, matching, time_slots, comp_types, st_name):
+    ' read miniseed files and from a list of string names and returns 3 dictionaries of numpy arrays, meta data, and time slice info'
+
+    json_file = open(args['stations_json'])
+    stations_ = json.load(json_file)
+
+    st = obspy.core.Stream()
+    tsw = False
+    for m in matching:
+        temp_st = read(os.path.join(str(args['input_dir']), m),debug_headers=True)
+        if tsw == False and temp_st:
+            tsw = True
+            for tr in temp_st:
+                time_slots.append((tr.stats.starttime, tr.stats.endtime))
+        try:
+            temp_st.merge(fill_value=0)
+        except Exception:
+            temp_st =_resampling(temp_st)
+            temp_st.merge(fill_value=0)
+        temp_st.detrend('demean')
+        st += temp_st
+
+    st.filter(type='bandpass', freqmin = 1.0, freqmax = 45, corners=2, zerophase=True)
+    st.taper(max_percentage=0.001, type='cosine', max_length=2)
+    if len([tr for tr in st if tr.stats.sampling_rate != 100.0]) != 0:
+        try:
+            st.interpolate(100, method="linear")
+        except Exception:
+            st=_resampling(st)
+
+    st.trim(min([tr.stats.starttime for tr in st]), max([tr.stats.endtime for tr in st]), pad=True, fill_value=0)
+
+    start_time = st[0].stats.starttime
+    end_time = st[0].stats.endtime
+
+    meta = {"start_time":start_time,
+            "end_time": end_time,
+            "trace_name":m
+             }
+
+    chanL = [tr.stats.channel[-1] for tr in st]
+    comp_types.append(len(chanL))
+    tim_shift = int(60-(args['overlap']*60))
+    next_slice = start_time+60
+
+    data_set={}
+
+    sl = 0; st_times = []
+    #while next_slice <= end_time:
+    npz_data = np.zeros([6000, 3])
+    st_times.append(str(start_time).replace('T', ' ').replace('Z', ''))
+    w = st.slice(start_time, next_slice)
+    if 'Z' in chanL:
+        npz_data[:,2] = w[chanL.index('Z')].data[:6000]
+    if ('E' in chanL) or ('1' in chanL):
+        try:
+            npz_data[:,0] = w[chanL.index('E')].data[:6000]
+        except Exception:
+            npz_data[:,0] = w[chanL.index('1')].data[:6000]
+    if ('N' in chanL) or ('2' in chanL):
+        try:
+            npz_data[:,1] = w[chanL.index('N')].data[:6000]
+        except Exception:
+            npz_data[:,1] = w[chanL.index('2')].data[:6000]
+
+    data_set.update( {str(start_time).replace('T', ' ').replace('Z', '') : npz_data})
+
+    start_time = start_time+tim_shift
+    next_slice = next_slice+tim_shift
+    sl += 1
+
+    meta["trace_start_time"] = st_times
+
+    try:
+        meta["receiver_code"]=st[0].stats.station
+        meta["instrument_type"]=st[0].stats.channel[:2]
+        meta["network_code"]=stations_[st[0].stats.station]['network']
+        meta["receiver_latitude"]=stations_[st[0].stats.station]['coords'][0]
+        meta["receiver_longitude"]=stations_[st[0].stats.station]['coords'][1]
+        meta["receiver_elevation_m"]=stations_[st[0].stats.station]['coords'][2]
+    except Exception:
+        meta["receiver_code"]=st_name
+        meta["instrument_type"]=stations_[st_name]['channels'][0][:2]
+        meta["network_code"]=stations_[st_name]['network']
+        meta["receiver_latitude"]=stations_[st_name]['coords'][0]
+        meta["receiver_longitude"]=stations_[st_name]['coords'][1]
+        meta["receiver_elevation_m"]=stations_[st_name]['coords'][2]
+
+    return meta, time_slots, comp_types, data_set
 
 """
 # original
@@ -202,7 +312,7 @@ for ct, st in enumerate(station_list):
     for _, month in enumerate(uni_list):
         matching = [s for s in file_list if month in s]
         print(f'{month}', flush=True)
-        meta, time_slots, comp_types, data_set = _mseed2nparry(args, matching, time_slots, comp_types, st)
+        meta, time_slots, comp_types, data_set = mseed2nparry_one_minute(args, matching, time_slots, comp_types, st)
 
         pred_generator = PreLoadGeneratorTest(meta["trace_start_time"], data_set, **params_pred)
 
