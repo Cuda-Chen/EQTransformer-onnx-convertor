@@ -20,12 +20,13 @@ def show_activation_map(model_name, file_name, trace_name):
     # pre-processing of trace here in the future
 
     # load model
-    """model = load_model('EqT_model.h5',
+    model = load_model('EqT_model.h5',
                         custom_objects={
                             'SeqSelfAttention': SeqSelfAttention, 
                             'FeedForward': FeedForward,
                             'LayerNormalization': LayerNormalization, 
-                            'f1': f1})"""
+                            'f1': f1})
+    #model.summary()
     #model = Model(inputs=model.input,outputs=model.get_layer(name='attentionS').output)
                   #outputs=[model.output, 
                      #model.get_layer(name='layer_normalization_4').output,
@@ -33,36 +34,38 @@ def show_activation_map(model_name, file_name, trace_name):
                      #model.get_layer(name='attentionS').output])
 
     # make prediction
-    #input_data = np.expand_dims(data, axis=0)
-    #print(data.shape)
-    #outputs = model.predict(data)
-    #print(outputs.shape)
+    input_data = np.expand_dims(data, axis=0)
+    outputs = model.predict(input_data)
 
     # plot the waveform and the activation heatmap
     fig = plt.figure()
     ax = fig.add_subplot(311)
-    plt.plot(data[:,0], 'k')
-    plt.rcParams["figure.figsize"] = (8, 5)
+    plt.plot(data[:,0]/abs(data[:,0]).max(), 'gray')
+    plt.plot(outputs[0][0], '--', color='b')
+    plt.rcParams["figure.figsize"] = (8, 8)
     plt.tight_layout()
-    ymin, ymax = ax.get_ylim()
-    plt.ylabel('Amplitude counts', fontsize=12)
-    ax.set_xticklabels([])   
+    plt.ylabel('Normalized\n amplitude', fontsize=12)
+    ax.set_xticklabels([])
+    ax.set_ylim([-1.1, 1.1])
 
     ax = fig.add_subplot(312)
-    plt.plot(data[:,1], 'k')
-    plt.rcParams["figure.figsize"] = (8, 5)
+    plt.plot(data[:,1]/abs(data[:,1]).max(), 'gray')
+    plt.plot(outputs[1][0], '--', color='g')
+    plt.rcParams["figure.figsize"] = (8, 8)
     plt.tight_layout()
-    ymin, ymax = ax.get_ylim()
-    plt.ylabel('Amplitude counts', fontsize=12)
-    ax.set_xticklabels([])
+    plt.ylabel('Normalized\n amplitude', fontsize=12)
+    ax.set_xticklabels([])    
+    ax.set_ylim([-1.1, 1.1])
 
     ax = fig.add_subplot(313)
-    plt.plot(data[:,2], 'k')
-    plt.rcParams["figure.figsize"] = (8, 5)
+    plt.plot(data[:,2]/abs(data[:,2]).max(), 'gray')
+    plt.plot(outputs[2][0], '--', color='r')
+    plt.rcParams["figure.figsize"] = (8, 8)
     plt.tight_layout()
-    ymin, ymax = ax.get_ylim()
-    plt.ylabel('Amplitude counts', fontsize=12)
-    ax.set_xticklabels([])
+    plt.ylabel('Normalized\n amplitude', fontsize=12)
+    ax.set_xticklabels([])    
+    ax.set_ylim([-1.1, 1.1])
+    
     plt.show()
 
 if __name__ == '__main__':
