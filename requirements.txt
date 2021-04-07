@@ -1,5 +1,5 @@
 obspy
-eqtransformer
+eqtransformer==0.1.58
 keras2onnx
 keras==2.2.5
 tensorflow==1.15.0
