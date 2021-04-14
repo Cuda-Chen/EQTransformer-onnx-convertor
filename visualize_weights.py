@@ -40,36 +40,43 @@ def show_activation_map(model_name, file_name, trace_name):
     # plot the waveform and the activation heatmap
     fig = plt.figure()
     ax = fig.add_subplot(311)
-    plt.plot(data[:,0]/abs(data[:,0]).max(), 'gray')
+    plt.plot(data[:,0]/abs(data[:,0]).max(), 'gray', alpha=0.3) # E component
     #plt.plot(outputs[0][0], '--', color='b')
-    plt.imshow(np.expand_dims(outputs[0][0], axis=0), cmap="plasma", aspect="auto")
+    im0 = plt.imshow(np.expand_dims(outputs[0][0], axis=0), cmap='Reds', aspect="auto", alpha=0.3)
     plt.rcParams["figure.figsize"] = (8, 8)
-    plt.tight_layout()
     plt.ylabel('Normalized\n amplitude', fontsize=12)
     ax.set_xticklabels([])
     ax.set_ylim([-1.1, 1.1])
+    cbar = plt.colorbar(im0, orientation='horizontal')
+    cbar.ax.set_xlabel('probability')
+    plt.tight_layout()
 
     ax = fig.add_subplot(312)
-    plt.plot(data[:,1]/abs(data[:,1]).max(), 'gray')
+    plt.plot(data[:,1]/abs(data[:,1]).max(), 'gray', alpha=0.3) # N component
     #plt.plot(outputs[1][0], '--', color='g')    
-    plt.imshow(np.expand_dims(outputs[1][0], axis=0), cmap="plasma", aspect="auto")
+    im1 = plt.imshow(np.expand_dims(outputs[1][0], axis=0), cmap="Reds", aspect="auto", alpha=0.5)
     plt.rcParams["figure.figsize"] = (8, 8)
-    plt.tight_layout()
     plt.ylabel('Normalized\n amplitude', fontsize=12)
     ax.set_xticklabels([])    
     ax.set_ylim([-1.1, 1.1])
+    cbar = plt.colorbar(im1, orientation='horizontal')
+    cbar.ax.set_xlabel('probability')
+    plt.tight_layout()
 
     ax = fig.add_subplot(313)
-    plt.plot(data[:,2]/abs(data[:,2]).max(), 'gray')
+    plt.plot(data[:,2]/abs(data[:,2]).max(), 'gray', alpha=0.3) # Z component
     #plt.plot(outputs[2][0], '--', color='r')    
-    plt.imshow(np.expand_dims(outputs[2][0], axis=0), cmap="plasma", aspect="auto")
+    im2 = plt.imshow(np.expand_dims(outputs[2][0], axis=0), cmap="Reds", aspect="auto", alpha=0.5)
     plt.rcParams["figure.figsize"] = (8, 8)
-    plt.tight_layout()
     plt.ylabel('Normalized\n amplitude', fontsize=12)
     ax.set_xticklabels([])    
     ax.set_ylim([-1.1, 1.1])
-    
+    cbar = plt.colorbar(im2, orientation='horizontal')
+    cbar.ax.set_xlabel('probability')
+    plt.tight_layout()
+
     plt.show()
+    #plt.savefig('foo.png')
 
 if __name__ == '__main__':
     model_name = "EqT_model.h5"
